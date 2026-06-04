@@ -1,1 +1,7 @@
 .worktrees/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+agent_home.sqlite
+.agent-home/
