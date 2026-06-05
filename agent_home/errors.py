@@ -22,6 +22,7 @@ ERROR_STATUS = {
     "path_conflict": 409,
     "invalid_path": 400,
     "object_too_large": 413,
+    "command_timeout": 408,
     "memory_not_found": 404,
     "memory_conflict": 409,
     "auto_extract_disabled": 409,

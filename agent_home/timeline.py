@@ -11,6 +11,7 @@ from agent_home.models import (
     BranchResponse,
     CheckpointKind,
     CheckpointResponse,
+    CreateBranchRequest,
     CreateCheckpointRequest,
     CreateMessageRequest,
     CreateRunRequest,
@@ -24,6 +25,7 @@ from agent_home.models import (
     SessionResponse,
     UpdateBranchRequest,
     UpdateRunStatusRequest,
+    UpdateSessionRequest,
 )
 
 router = APIRouter()
@@ -98,7 +100,7 @@ def checkpoint_response(row: sqlite3.Row) -> CheckpointResponse:
 
 
 def require_session(connection: sqlite3.Connection, agent_id: str, session_id: str) -> sqlite3.Row:
-    row = connection.execute(
+    row_result = connection.execute(
         """
         SELECT session_id, agent_id, title, metadata, active_branch_id
         FROM sessions
@@ -106,13 +108,14 @@ def require_session(connection: sqlite3.Connection, agent_id: str, session_id: s
         """,
         (agent_id, session_id),
     ).fetchone()
-    if row is None:
+    if row_result is None:
         raise_error("session_not_found", f"session {session_id} not found")
-    return row
+    assert row_result is not None
+    return row_result
 
 
 def require_branch(connection: sqlite3.Connection, agent_id: str, branch_id: str) -> sqlite3.Row:
-    row = connection.execute(
+    row_result = connection.execute(
         """
         SELECT branch_id, session_id, parent_branch_id, fork_checkpoint_id, base_message_cursor, resume_head
         FROM branches
@@ -120,13 +123,14 @@ def require_branch(connection: sqlite3.Connection, agent_id: str, branch_id: str
         """,
         (agent_id, branch_id),
     ).fetchone()
-    if row is None:
+    if row_result is None:
         raise_error("branch_not_found", f"branch {branch_id} not found")
-    return row
+    assert row_result is not None
+    return row_result
 
 
 def require_run(connection: sqlite3.Connection, agent_id: str, run_id: str) -> sqlite3.Row:
-    row = connection.execute(
+    row_result = connection.execute(
         """
         SELECT run_id, agent_id, session_id, branch_id, status
         FROM runs
@@ -134,13 +138,14 @@ def require_run(connection: sqlite3.Connection, agent_id: str, run_id: str) -> s
         """,
         (agent_id, run_id),
     ).fetchone()
-    if row is None:
+    if row_result is None:
         raise_error("run_not_found", f"run {run_id} not found")
-    return row
+    assert row_result is not None
+    return row_result
 
 
 def require_checkpoint(connection: sqlite3.Connection, agent_id: str, checkpoint_id: str) -> sqlite3.Row:
-    row = connection.execute(
+    row_result = connection.execute(
         """
         SELECT checkpoint_id, agent_id, session_id, branch_id, run_id, kind, name, message_cursor, metadata
         FROM checkpoints
@@ -148,9 +153,10 @@ def require_checkpoint(connection: sqlite3.Connection, agent_id: str, checkpoint
         """,
         (agent_id, checkpoint_id),
     ).fetchone()
-    if row is None:
+    if row_result is None:
         raise_error("checkpoint_not_found", f"checkpoint {checkpoint_id} not found")
-    return row
+    assert row_result is not None
+    return row_result
 
 
 def validate_session_branch(connection: sqlite3.Connection, agent_id: str, session_id: str, branch_id: str) -> sqlite3.Row:
@@ -234,10 +240,82 @@ def create_session(agent_id: str, request: CreateSessionRequest, http_request: R
     return session_response(row)
 
 
+@router.get("/v1/agents/{agent_id}/sessions", response_model=list[SessionResponse])
+def list_sessions(agent_id: str, http_request: Request) -> list[SessionResponse]:
+    rows = storage(http_request)._conn.execute(
+        """
+        SELECT session_id, agent_id, title, metadata, active_branch_id
+        FROM sessions
+        WHERE agent_id = ?
+        ORDER BY updated_at DESC
+        """,
+        (agent_id,),
+    ).fetchall()
+    return [session_response(row) for row in rows]
+
+
 @router.get("/v1/agents/{agent_id}/sessions/{session_id}", response_model=SessionResponse)
 def get_session(agent_id: str, session_id: str, http_request: Request) -> SessionResponse:
     row = require_session(storage(http_request)._conn, agent_id, session_id)
     return session_response(row)
+
+
+@router.patch("/v1/agents/{agent_id}/sessions/{session_id}", response_model=SessionResponse)
+def update_session(agent_id: str, session_id: str, request: UpdateSessionRequest, http_request: Request) -> SessionResponse:
+    with storage(http_request).transaction() as connection:
+        require_session(connection, agent_id, session_id)
+        if request.active_branch_id is not None:
+            validate_session_branch(connection, agent_id, session_id, request.active_branch_id)
+        if request.title is not None:
+            connection.execute(
+                """
+                UPDATE sessions
+                SET title = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE agent_id = ? AND session_id = ?
+                """,
+                (request.title, agent_id, session_id),
+            )
+        if request.metadata is not None:
+            connection.execute(
+                """
+                UPDATE sessions
+                SET metadata = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE agent_id = ? AND session_id = ?
+                """,
+                (json.dumps(request.metadata), agent_id, session_id),
+            )
+        if request.active_branch_id is not None:
+            connection.execute(
+                """
+                UPDATE sessions
+                SET active_branch_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE agent_id = ? AND session_id = ?
+                """,
+                (request.active_branch_id, agent_id, session_id),
+            )
+    row = require_session(storage(http_request)._conn, agent_id, session_id)
+    return session_response(row)
+
+
+@router.post("/v1/agents/{agent_id}/sessions/{session_id}/branches", response_model=BranchResponse)
+def create_branch(agent_id: str, session_id: str, request: CreateBranchRequest, http_request: Request) -> BranchResponse:
+    branch_id = request.branch_id or str(uuid4())
+    try:
+        with storage(http_request).transaction() as connection:
+            require_session(connection, agent_id, session_id)
+            if request.parent_branch_id:
+                validate_session_branch(connection, agent_id, session_id, request.parent_branch_id)
+            connection.execute(
+                """
+                INSERT INTO branches(branch_id, session_id, agent_id, parent_branch_id, fork_checkpoint_id, base_message_cursor, resume_head)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (branch_id, session_id, agent_id, request.parent_branch_id, request.fork_checkpoint_id, request.base_message_cursor, ""),
+            )
+    except sqlite3.IntegrityError:
+        raise_error("branch_exists", f"branch {branch_id} already exists")
+    row = require_branch(storage(http_request)._conn, agent_id, branch_id)
+    return branch_response(row)
 
 
 @router.post("/v1/agents/{agent_id}/sessions/{session_id}/resume", response_model=ResumeResponse)
@@ -274,7 +352,7 @@ def resume_session(agent_id: str, session_id: str, http_request: Request) -> Res
 def rewind_session(agent_id: str, session_id: str, request: RewindRequest, http_request: Request) -> RewindResponse:
     new_branch_id = str(uuid4())
     with storage(http_request).transaction() as connection:
-        session = require_session(connection, agent_id, session_id)
+        require_session(connection, agent_id, session_id)
         checkpoint = require_checkpoint(connection, agent_id, request.checkpoint_id)
         if checkpoint["session_id"] != session_id:
             raise_error("checkpoint_not_found", f"checkpoint {request.checkpoint_id} not found for session {session_id}")
@@ -300,6 +378,12 @@ def rewind_session(agent_id: str, session_id: str, request: RewindRequest, http_
     return RewindResponse(new_branch_id=new_branch_id, messages=collect_visible_messages(agent_id, branch, http_request))
 
 
+@router.get("/v1/agents/{agent_id}/branches/{branch_id}", response_model=BranchResponse)
+def get_branch(agent_id: str, branch_id: str, http_request: Request) -> BranchResponse:
+    row = require_branch(storage(http_request)._conn, agent_id, branch_id)
+    return branch_response(row)
+
+
 @router.post("/v1/agents/{agent_id}/runs", response_model=RunResponse)
 def create_run(agent_id: str, request: CreateRunRequest, http_request: Request) -> RunResponse:
     try:
@@ -323,6 +407,31 @@ def create_run(agent_id: str, request: CreateRunRequest, http_request: Request) 
         (agent_id, request.run_id),
     ).fetchone()
     return run_response(row)
+
+
+@router.get("/v1/agents/{agent_id}/runs/{run_id}", response_model=RunResponse)
+def get_run(agent_id: str, run_id: str, http_request: Request) -> RunResponse:
+    row = require_run(storage(http_request)._conn, agent_id, run_id)
+    return run_response(row)
+
+
+@router.get("/v1/agents/{agent_id}/branches/{branch_id}/runs/latest", response_model=RunResponse)
+def get_latest_branch_run(agent_id: str, branch_id: str, http_request: Request) -> RunResponse:
+    require_branch(storage(http_request)._conn, agent_id, branch_id)
+    row_result = storage(http_request)._conn.execute(
+        """
+        SELECT run_id, agent_id, session_id, branch_id, status
+        FROM runs
+        WHERE agent_id = ? AND branch_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT 1
+        """,
+        (agent_id, branch_id),
+    ).fetchone()
+    if row_result is None:
+        raise_error("run_not_found", f"run not found for branch {branch_id}")
+    assert row_result is not None
+    return run_response(row_result)
 
 
 @router.patch("/v1/agents/{agent_id}/runs/{run_id}/status", response_model=RunResponse)
@@ -351,7 +460,7 @@ def update_run_status(agent_id: str, run_id: str, request: UpdateRunStatusReques
 @router.patch("/v1/agents/{agent_id}/branches/{branch_id}", response_model=BranchResponse)
 def update_branch(agent_id: str, branch_id: str, request: UpdateBranchRequest, http_request: Request) -> BranchResponse:
     with storage(http_request).transaction() as connection:
-        branch = require_branch(connection, agent_id, branch_id)
+        require_branch(connection, agent_id, branch_id)
         if request.resume_head is not None:
             if request.resume_head:
                 checkpoint = require_checkpoint(connection, agent_id, request.resume_head)
@@ -494,6 +603,12 @@ def create_checkpoint(agent_id: str, request: CreateCheckpointRequest, http_requ
         """,
         (agent_id, request.checkpoint_id),
     ).fetchone()
+    return checkpoint_response(row)
+
+
+@router.get("/v1/agents/{agent_id}/checkpoints/{checkpoint_id}", response_model=CheckpointResponse)
+def get_checkpoint(agent_id: str, checkpoint_id: str, http_request: Request) -> CheckpointResponse:
+    row = require_checkpoint(storage(http_request)._conn, agent_id, checkpoint_id)
     return checkpoint_response(row)
 
 

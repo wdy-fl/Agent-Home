@@ -44,6 +44,12 @@ class CreateSessionRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class UpdateSessionRequest(BaseModel):
+    title: str | None = None
+    metadata: dict[str, Any] | None = None
+    active_branch_id: str | None = None
+
+
 class SessionResponse(BaseModel):
     session_id: str
     agent_id: str
@@ -59,6 +65,13 @@ class BranchResponse(BaseModel):
     fork_checkpoint_id: str = ""
     base_message_cursor: int = 0
     resume_head: str = ""
+
+
+class CreateBranchRequest(BaseModel):
+    branch_id: str | None = None
+    parent_branch_id: str = ""
+    fork_checkpoint_id: str = ""
+    base_message_cursor: int = 0
 
 
 class UpdateBranchRequest(BaseModel):
@@ -169,3 +182,16 @@ class MemoryResponse(BaseModel):
 class ExtractionRequest(BaseModel):
     session_id: str
     trigger: str
+
+
+class WorkspaceCommandRequest(BaseModel):
+    command: str = Field(min_length=1)
+    timeout_seconds: int = Field(default=120, gt=0, le=600)
+    env: dict[str, str] = Field(default_factory=dict)
+
+
+class WorkspaceCommandResponse(BaseModel):
+    exit_code: int
+    stdout: str
+    stderr: str
+    changed_paths: list[str]

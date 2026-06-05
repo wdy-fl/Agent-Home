@@ -8,6 +8,7 @@ from pathlib import Path
 class Settings:
     database_path: Path = Path("agent_home.sqlite")
     object_root: Path = Path(".agent-home/objects")
+    execution_root: Path = Path(".agent-home/execution")
 
 
 def default_settings() -> Settings:
