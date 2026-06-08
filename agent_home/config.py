@@ -7,8 +7,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Settings:
     database_path: Path = Path("agent_home.sqlite")
-    object_root: Path = Path(".agent-home/objects")
-    execution_root: Path = Path(".agent-home/execution")
+    workspace_root: Path = Path(".workspace")
 
 
 def default_settings() -> Settings:

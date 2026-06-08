@@ -8,6 +8,7 @@ ERROR_STATUS = {
     "auth_failed": 401,
     "agent_not_found": 404,
     "agent_exists": 409,
+    "invalid_agent_id": 400,
     "session_exists": 409,
     "run_exists": 409,
     "message_exists": 409,

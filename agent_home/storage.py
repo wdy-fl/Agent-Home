@@ -80,22 +80,6 @@ CREATE TABLE IF NOT EXISTS checkpoints (
     PRIMARY KEY (agent_id, checkpoint_id)
 );
 
-CREATE TABLE IF NOT EXISTS workspace_objects (
-    agent_id TEXT NOT NULL,
-    object_id TEXT NOT NULL,
-    path TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    content_type TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    content_hash TEXT NOT NULL,
-    storage_key TEXT NOT NULL,
-    metadata TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (agent_id, object_id),
-    UNIQUE(agent_id, path)
-);
-
 CREATE TABLE IF NOT EXISTS memories (
     memory_id TEXT NOT NULL,
     agent_id TEXT NOT NULL,

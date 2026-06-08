@@ -15,6 +15,7 @@ from agent_home.models import AgentConfig, AgentCreatedResponse, AgentResponse, 
 from agent_home.storage import Storage
 from agent_home.timeline import router as timeline_router
 from agent_home.workspace import router as workspace_router
+from agent_home.workspace_manager import ensure_workspace
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/v1/agents", response_model=AgentCreatedResponse, status_code=201)
     def create_agent(request: CreateAgentRequest) -> AgentCreatedResponse:
+        ensure_workspace(app.state.settings, request.agent_id)
         token = new_token()
         config = AgentConfig()
         try:

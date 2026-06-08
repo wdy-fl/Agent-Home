@@ -19,7 +19,7 @@ class CheckpointKind(str, Enum):
 
 
 class CreateAgentRequest(BaseModel):
-    agent_id: str = Field(min_length=1)
+    agent_id: str = Field(min_length=1, pattern=r"^[0-9]+$")
 
 
 class AgentConfig(BaseModel):
@@ -194,4 +194,3 @@ class WorkspaceCommandResponse(BaseModel):
     exit_code: int
     stdout: str
     stderr: str
-    changed_paths: list[str]
