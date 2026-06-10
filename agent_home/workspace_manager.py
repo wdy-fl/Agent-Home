@@ -50,7 +50,7 @@ def ensure_workspace(settings: Settings, agent_id: str) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     agent_md = path / "AGENT.md"
     if not agent_md.exists():
-        agent_md.write_text(AGENT_MD_TEMPLATE.format(agent_id=agent_id))
+        agent_md.write_text(AGENT_MD_TEMPLATE.format(agent_id=agent_id), encoding="utf-8")
     return path
 
 

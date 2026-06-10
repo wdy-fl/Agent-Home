@@ -106,7 +106,7 @@ def read_file(agent_id: str, body: WorkspaceReadRequest, request: Request) -> Wo
     max_size = _max_size(request)
     if target.stat().st_size > max_size:
         raise_error("object_too_large", f"file exceeds max size of {max_size} bytes")
-    content = target.read_text()
+    content = target.read_text(encoding="utf-8")
     return WorkspaceReadResponse(content=content, size=len(content.encode()))
 
 
@@ -120,7 +120,7 @@ def write_file(agent_id: str, body: WorkspaceWriteRequest, request: Request) -> 
     if target.is_dir():
         raise_error("invalid_path", f"cannot overwrite a directory: {body.path}")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body.content)
+    target.write_text(body.content, encoding="utf-8")
     return WorkspaceWriteResponse(path=body.path, size=len(content_bytes))
 
 
