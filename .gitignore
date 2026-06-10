@@ -1,4 +1,5 @@
 .worktrees/
+.claude/
 .workspace/
 agent_home.egg-info/
 
