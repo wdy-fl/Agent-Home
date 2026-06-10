@@ -194,3 +194,45 @@ class WorkspaceCommandResponse(BaseModel):
     exit_code: int
     stdout: str
     stderr: str
+
+
+class WorkspaceFileInfo(BaseModel):
+    name: str
+    type: str  # "file" | "dir"
+    size: int
+    modified: str  # ISO timestamp
+
+
+class WorkspaceListRequest(BaseModel):
+    path: str = "."
+
+
+class WorkspaceListResponse(BaseModel):
+    entries: list[WorkspaceFileInfo]
+
+
+class WorkspaceReadRequest(BaseModel):
+    path: str
+
+
+class WorkspaceReadResponse(BaseModel):
+    content: str
+    size: int
+
+
+class WorkspaceWriteRequest(BaseModel):
+    path: str
+    content: str
+
+
+class WorkspaceWriteResponse(BaseModel):
+    path: str
+    size: int
+
+
+class WorkspaceDeleteRequest(BaseModel):
+    path: str
+
+
+class WorkspaceDeleteResponse(BaseModel):
+    deleted: bool

@@ -52,3 +52,14 @@ def ensure_workspace(settings: Settings, agent_id: str) -> Path:
     if not agent_md.exists():
         agent_md.write_text(AGENT_MD_TEMPLATE.format(agent_id=agent_id))
     return path
+
+
+def resolve_workspace_path(settings: Settings, agent_id: str, relative_path: str) -> Path:
+    """Resolve a relative path within the agent's workspace, preventing path traversal."""
+    root = ensure_workspace(settings, agent_id).resolve()
+    resolved = (root / relative_path).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise_error("invalid_path", "path escapes workspace")
+    return resolved

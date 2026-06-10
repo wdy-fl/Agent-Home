@@ -8,6 +8,7 @@ from pathlib import Path
 class Settings:
     database_path: Path = Path("agent_home.sqlite")
     workspace_root: Path = Path(".workspace")
+    workspace_max_object_size: int = 1_000_000
 
 
 def default_settings() -> Settings:
