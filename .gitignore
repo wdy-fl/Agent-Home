@@ -1,4 +1,6 @@
 .worktrees/
+.workspace/
+agent_home.egg-info/
 
 __pycache__/
 *.py[cod]
